@@ -1,0 +1,19 @@
+cmake_minimum_required(VERSION 3.0)
+project(testpro)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall ")
+
+
+set(Boost_USE_STATIC_LIBS OFF) 
+set(Boost_USE_MULTITHREADED ON)  
+set(Boost_USE_STATIC_RUNTIME OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
+find_package(Boost 1.45.0 COMPONENTS system thread) 
+
+if(Boost_FOUND)
+	include_directories(${Boost_INCLUDE_DIRS}) 
+	include_directories(${PROJECT_SOURCE_DIR}) 
+	file(GLOB SOURCE_FILES "src/*.cxx")
+	add_executable(programe ${SOURCE_FILES})
+	target_link_libraries(programe ${Boost_LIBRARIES})
+	set_target_properties(programe PROPERTIES RUNTIME_OUTPUT_DIRECTORY "../bin/")
+endif()
