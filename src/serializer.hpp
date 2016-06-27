@@ -1,5 +1,6 @@
 #include <boost/asio.hpp>
 #include <boost/archive/binary_oarchive.hpp>
+#include <boost/system/error_code.hpp>
 #include <sstream>
 #include <string>
 #include <array>
@@ -17,6 +18,7 @@ namespace t3o
 			using boost::asio::ip::tcp; 
 			using boost::asio::buffer;
 			using boost::asio::const_buffer;
+			using boost::asio::async_write;
 
 			class basic_serializer
 			{
@@ -39,6 +41,8 @@ namespace t3o
 
 		}
 
+		void test_handler(const boost::system::error_code&, std::size_t){}
+
 		class async_serializer : detail::basic_serializer
 		{
 			public:
@@ -51,7 +55,8 @@ namespace t3o
 				async_serializer& operator<<(Serializable& t)
 				{
 					auto packet = prepare_packet(t);
-					_socket.async_write_some(packet);
+					
+					detail::async_write(_socket, packet, test_handler);
 					return *this;
 				}
 
