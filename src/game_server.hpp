@@ -1,7 +1,7 @@
 #include <boost/asio.hpp>
 #include <functional>
 
-namespace t30
+namespace t3o
 {
 	namespace detail
 	{
