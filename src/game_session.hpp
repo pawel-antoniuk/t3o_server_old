@@ -1,7 +1,9 @@
+#pragma once
 #include <boost/asio.hpp>
 #include <array>
 #include <cstdint>
 #include <utility>
+#include <iostream> //debug
 
 #include "protocol_detail.hpp"
 #include "serializer.hpp"
@@ -21,11 +23,14 @@ namespace t3o
 				_socket{std::move(socket)},
 				_serializer{_socket}
 			{
-
+				async_run();
 			}
 
 			void async_run()
 			{
+				_serializer.async_read<detail::protocol::field_set_packet_t>([this](auto& data){
+					std::cout << "kek" << std::endl;
+				});
 			}
 
 			void async_send_field_set(unsigned x, unsigned y, unsigned field)
@@ -34,17 +39,10 @@ namespace t3o
 				packet.x = x;
 				packet.y = y;
 				packet.field = field;
-				_serializer << packet;
+				_serializer.async_write(packet, [](auto er, auto size){});
 			}
 
 		private:
-			void _read_next_header()
-			{
-			}
-
-			void _read_next_position_set()
-			{
-			}
 
 			detail::array<uint8_t, 8> _packet_buffer;
 			detail::tcp::socket _socket;
