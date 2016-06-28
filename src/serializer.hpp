@@ -9,6 +9,7 @@
 #include <utility>
 #include <functional>
 #include <memory>
+#include <tuple>
 
 namespace t3o
 {
@@ -40,17 +41,17 @@ namespace t3o
 						detail::ostringstream oss;
 						detail::binary_oarchive archive{oss};
 						archive << t;
-						auto output = oss.str();
-						packet_size_t size = static_cast<uint8_t>(output.size());
+						_tmp_output = oss.str();
+						_tmp_packet_size  = static_cast<uint8_t>(_tmp_output.size());
 						std::array<detail::const_buffer, 2> packet{{
-							detail::buffer(&size, sizeof(packet_size_t)),
-							detail::buffer(output) 
+							detail::buffer(&_tmp_packet_size, sizeof(_tmp_packet_size)),
+							detail::buffer(_tmp_output) 
 						}};
 						return packet;
 					}
 
 					template<typename Serializable>
-					Serializable prepare_input_packet(std::string data, packet_size_t size)
+					Serializable prepare_input_packet(const std::string& data, packet_size_t size)
 					{
 						detail::istringstream iss{data};
 						detail::binary_iarchive archive{iss};
@@ -58,6 +59,11 @@ namespace t3o
 						archive >> t;
 						return t;
 					}
+
+				private:
+					packet_size_t _tmp_packet_size;
+					std::string _tmp_output;
+
 			};
 
 		}
