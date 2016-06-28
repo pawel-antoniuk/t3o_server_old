@@ -8,11 +8,11 @@ namespace t3o
 	template<typename T>
 	class event;
 
-	template<typename ...Args, typename Ret>
-	class event<Ret(Args...)>
+	template<typename ...Args>
+	class event<void(Args...)>
 	{
 	public:
-		using callable_t = std::function<Ret(Args...)>;
+		using callable_t = std::function<void(Args...)>;
 
 		event& operator+=(const callable_t& e)
 		{

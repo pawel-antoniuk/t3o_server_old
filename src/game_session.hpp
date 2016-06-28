@@ -20,11 +20,17 @@ namespace t3o
 	class game_session
 	{
 		public:
-			explicit game_session(detail::tcp::socket&& socket) :
-				_socket{std::move(socket)},
-				_serializer{_socket}
+			explicit game_session(detail::io_service& service) :
+				_socket{service},
+				_serializer{_socket},
+				_is_closed{false}
 			{
-				async_run();
+				_serializer.event_disconnected() += std::bind(&game_session::close, this);
+			}
+
+			~game_session()
+			{
+				close();
 			}
 
 			void async_run()
@@ -49,12 +55,39 @@ namespace t3o
 				return _field_set_event;
 			}
 
+			detail::tcp::socket& socket()
+			{
+				return _socket;
+			}
+
+			auto& event_disconnected()
+			{
+				return _serializer.event_disconnected();
+			}
+
+
+			void close()
+			{
+				if(_is_closed) return;
+				_disconnected_event();
+				_socket.close();
+				_is_closed = true;
+			}
+
+			bool is_closed()
+			{
+				return _is_closed;
+			}
+
 		private:
 
-			detail::array<uint8_t, 8> _packet_buffer;
 			detail::tcp::socket _socket;
 			detail::async_serializer _serializer;
+			bool _is_closed;
+
+			//events
 			event<void(unsigned x, unsigned y, unsigned field)> _field_set_event;
+			event<void()> _disconnected_event;
 	};
 }
 

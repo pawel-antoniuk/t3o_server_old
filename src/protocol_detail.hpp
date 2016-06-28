@@ -9,8 +9,6 @@ namespace t3o
 		{
 			struct field_set_packet_t
 			{
-				static const unsigned id = 1;
-
 				uint8_t x, y, field;
 
 				template<typename Archive> 
@@ -18,6 +16,8 @@ namespace t3o
 				{ 
 					ar & x & y & field;
 				}
+
+				static const uint8_t packet_id = 1;
 			};
 		}
 	}
