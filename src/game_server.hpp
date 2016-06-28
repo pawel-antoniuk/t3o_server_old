@@ -32,7 +32,10 @@ namespace t3o
 					detail::tcp::socket socket{_io_service};
 					detail::tcp::endpoint endpoint;
 					_acceptor.accept(socket, endpoint);
-					_sessions.emplace_back(std::move(socket));
+					game_session session {std::move(socket)};
+					using namespace std::placeholders;
+					session.event_field_set() += _user_field_set_event.make_handler(_1, _2, _3); 
+					_sessions.push_back(std::move(session));
 				}
 			}
 

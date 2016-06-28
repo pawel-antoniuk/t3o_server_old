@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 project(testpro)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -stdlib=libc++ -Wall")
 
 
 set(Boost_USE_STATIC_LIBS OFF) 

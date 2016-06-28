@@ -20,10 +20,15 @@ namespace t3o
 			return *this;
 		}
 
-		event& operator()(Args... args) 
+		void operator()(Args... args) 
 		{
 			for (auto& e : _callables) e(std::forward<Args>(args)...);
-			return *this;
+		}
+
+		template<typename ...HandlerArgs>
+		auto make_handler(HandlerArgs... args)
+		{
+			return std::bind(&event::operator(), this, std::forward<HandlerArgs>(args)...);
 		}
 
 	private:

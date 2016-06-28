@@ -7,6 +7,7 @@
 
 #include "protocol_detail.hpp"
 #include "serializer.hpp"
+#include "event.hpp"
 
 namespace t3o
 {
@@ -30,6 +31,7 @@ namespace t3o
 			{
 				_serializer.async_read<detail::protocol::field_set_packet_t>([this](auto& data){
 					std::cout << "kek" << std::endl;
+					_field_set_event(data.x, data.y, data.field);
 				});
 			}
 
@@ -42,11 +44,17 @@ namespace t3o
 				_serializer.async_write(packet, [](auto er, auto size){});
 			}
 
+			auto& event_field_set()
+			{
+				return _field_set_event;
+			}
+
 		private:
 
 			detail::array<uint8_t, 8> _packet_buffer;
 			detail::tcp::socket _socket;
 			detail::async_serializer _serializer;
+			event<void(unsigned x, unsigned y, unsigned field)> _field_set_event;
 	};
 }
 
