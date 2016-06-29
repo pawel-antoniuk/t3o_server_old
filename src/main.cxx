@@ -5,9 +5,8 @@
 #include <cstdio>
 #include <thread>
 #include <chrono>
+
 #include "game_server.hpp"
-#include "protocol_detail.hpp"
-#include "serializer.hpp"
 
 int main()
 {

@@ -15,6 +15,7 @@
 #include <iostream> //debug
 
 #include "event.hpp"
+#include "exceptions.hpp"
 
 namespace t3o
 {
@@ -24,8 +25,6 @@ namespace t3o
 		{
 			using std::ostringstream;
 			using std::istringstream;
-			using boost::archive::text_oarchive;
-			using boost::archive::text_iarchive;
 			using boost::asio::io_service;
 			using boost::asio::ip::tcp; 
 			using boost::asio::buffer;
@@ -39,10 +38,13 @@ namespace t3o
 			using packet_id_t = uint8_t;
 		}
 
-		class async_serializer 
+		template<typename InputArchive, typename OutputArchive>
+		class basic_async_serializer 
 		{
+			using iarchive_t = InputArchive;
+			using oarchive_t = OutputArchive;
 			public:
-				explicit async_serializer(detail::tcp::socket& socket) :
+				explicit basic_async_serializer(detail::tcp::socket& socket) :
 					_socket(socket)
 				{
 					_clear_read_state();
@@ -53,7 +55,10 @@ namespace t3o
 				void async_write(const Serializable& t, Handler handler)
 				{
 					auto packet = _prepare_output_packet(t);
-					detail::async_write(_socket, packet, handler);
+					using namespace std::placeholders;
+					auto binder = std::bind(&basic_async_serializer<InputArchive, OutputArchive>
+							::_on_packet_written<Serializable, Handler>, this, handler, _1, _2);
+					detail::async_write(_socket, packet, binder);
 				}
 
 				template<typename Serializable, typename Handler>
@@ -64,8 +69,8 @@ namespace t3o
 						detail::buffer(&_tmp_read_packet_size, sizeof(_tmp_read_packet_size)),
 						detail::buffer(&_tmp_read_packet_id, sizeof(_tmp_read_packet_id))
 					}};
-					auto binder = std::bind(&async_serializer::_read_header<Serializable, Handler>, 
-								this, handler, _1, _2);
+					auto binder = std::bind(&basic_async_serializer<InputArchive, OutputArchive>
+							::_on_header_read<Serializable, Handler>, this, handler, _1, _2);
 					detail::async_read(_socket, packet, binder);
 				}
 
@@ -76,12 +81,11 @@ namespace t3o
 
 			
 			private:
-
 				template<typename Serializable>
 				std::array<detail::const_buffer, 3> _prepare_output_packet(const Serializable& t)
 				{
 					detail::ostringstream oss;
-					detail::text_oarchive archive{oss, boost::archive::no_header};
+					oarchive_t archive{oss, boost::archive::no_header};
 					archive << t;
 					_tmp_write_output = oss.str();
 					_tmp_write_packet_size  = static_cast<uint8_t>(_tmp_write_output.size());
@@ -97,12 +101,11 @@ namespace t3o
 				Serializable _prepare_input_packet(const std::string& data, detail::packet_size_t size)
 				{
 					detail::istringstream iss{data};
-					detail::text_iarchive archive{iss};
+					iarchive_t archive{iss};
 					Serializable t;
 					archive >> t;
 					return t;
 				}
-
 
 				bool _check_connection(const detail::error_code& er)
 				{
@@ -110,28 +113,37 @@ namespace t3o
 					_disconnected_event();
 					return false;
 				}
-				
+
 				template<typename Serializable, typename Handler>
-				void _read_header(Handler handler, const detail::error_code& er, std::size_t size)
+				void _on_packet_written(Handler handler, const detail::error_code& er, std::size_t size)
 				{
 					if(!_check_connection(er)) return;
-					if(_tmp_read_packet_id != Serializable::packet_id) throw "bad packet"; //TODO
+
+					handler();
+				}
+				
+				template<typename Serializable, typename Handler>
+				void _on_header_read(Handler handler, const detail::error_code& er, std::size_t size)
+				{
+					if(!_check_connection(er)) return;
+					if(_tmp_read_packet_id != Serializable::packet_id) throw packet_format_error();
 
 					using namespace std::placeholders;
 					_tmp_read_packet_body.resize(_tmp_read_packet_size, 0);
-					auto binder = std::bind(&async_serializer::_read_body<Serializable, Handler>, 
+					auto binder = std::bind(&basic_async_serializer::_on_body_read<Serializable, Handler>, 
 								this, handler, _1, _2);
 					detail::async_read(_socket, detail::buffer(&_tmp_read_packet_body[0], _tmp_read_packet_size),
 							binder);
 				}
 
 				template<typename Serializable, typename Handler>
-				void _read_body(Handler handler, const detail::error_code& er, std::size_t size)
+				void _on_body_read(Handler handler, const detail::error_code& er, std::size_t size)
 				{
 					if(!_check_connection(er)) return;
 
 					auto t = _prepare_input_packet<Serializable>(_tmp_read_packet_body, _tmp_read_packet_size);
 					handler(t);
+					_clear_read_state();
 				}
 
 				void _clear_write_state()
@@ -162,5 +174,8 @@ namespace t3o
 				//events
 				event<void()> _disconnected_event;
 		};
+
+		using text_async_serializer 
+			= basic_async_serializer<boost::archive::text_iarchive, boost::archive::text_oarchive>;
 	}
 }

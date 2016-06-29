@@ -30,14 +30,13 @@ namespace t3o
 				_acceptor{_io_service, ep}
 			{
 				_create_session();
-
 			}
 
 			void set_field(unsigned x, unsigned y, unsigned field)
 			{
 				for(auto& session : _sessions)
 				{
-					session->async_send_field_set(x, y, field);
+					session->async_send_field_set(x, y, field, []{/*do nothing*/});
 				}
 			}
 
@@ -58,8 +57,7 @@ namespace t3o
 			}
 			
 		private:
-
-			void _acceptor_proc(detail::session_ptr& session, 
+			void _on_accepted(detail::session_ptr& session, 
 					const boost::system::error_code& code)
 			{
 				//std::cout << "new client " << _sessions.size() << std::endl;
@@ -78,8 +76,7 @@ namespace t3o
 				_sessions.push_back(session);
 				using namespace std::placeholders;
 				_acceptor.async_accept(session->socket(), 
-						std::bind(&game_server::_acceptor_proc, this, session, _1));
-				//return session;
+						std::bind(&game_server::_on_accepted, this, session, _1));
 			}
 
 			void _client_disconnected(detail::session_ptr& session)

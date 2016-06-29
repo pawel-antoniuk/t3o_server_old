@@ -6,7 +6,7 @@
 #include <iostream> //debug
 
 #include "protocol_detail.hpp"
-#include "serializer.hpp"
+#include "async_serializer.hpp"
 #include "event.hpp"
 
 namespace t3o
@@ -41,13 +41,14 @@ namespace t3o
 				});
 			}
 
-			void async_send_field_set(unsigned x, unsigned y, unsigned field)
+			template<typename Handler>
+			void async_send_field_set(unsigned x, unsigned y, unsigned field, Handler handler)
 			{
 				detail::protocol::field_set_packet_t packet;
 				packet.x = x;
 				packet.y = y;
 				packet.field = field;
-				_serializer.async_write(packet, [](auto er, auto size){});
+				_serializer.async_write(packet, handler);
 			}
 
 			auto& event_field_set()
@@ -82,7 +83,7 @@ namespace t3o
 		private:
 
 			detail::tcp::socket _socket;
-			detail::async_serializer _serializer;
+			detail::text_async_serializer _serializer;
 			bool _is_closed;
 
 			//events
