@@ -38,9 +38,10 @@ namespace t3o
 			{
 				//do handshake
 				using namespace std::placeholders;
-				using packet_t = detail::protocol::field_set_packet_t;
-				auto binder = std::bind(&game_session::_on_field_set, this, _1);
-				_serializer.async_read<packet_t>(binder);
+				using namespace detail::protocol;
+				auto field_set_binder = std::bind(&game_session::_on_field_set, this, _1);
+				auto handshake_binder = std::bind(&game_session::_on_handshake, this, _1);
+				_serializer.async_read<handshake_t, field_set_packet_t>(handshake_binder, field_set_binder);
 			}
 			
 			template<typename Handler>
@@ -82,11 +83,16 @@ namespace t3o
 			}
 
 		private:
+			void _on_handshake(const detail::protocol::handshake_t& data)
+			{
+
+			}
+
 			void _on_field_set(const detail::protocol::field_set_packet_t& data)
 			{
 				using namespace std::placeholders;
 				auto binder = std::bind(&game_session::_on_field_set, this, _1);
-				//_serializer.async_read<detail::protocol::field_set_packet_t>(binder);
+				_serializer.async_read<detail::protocol::field_set_packet_t>(binder);
 			}
 
 			detail::tcp::socket _socket;

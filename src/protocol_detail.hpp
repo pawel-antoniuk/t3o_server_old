@@ -12,7 +12,7 @@ namespace t3o
 				uint8_t width, height, field;
 
 				template<typename Archive>
-				void serializer(Archive& ar, const unsigned)
+				void serialize(Archive& ar, const unsigned)
 				{
 					ar & width & height & field;
 				}

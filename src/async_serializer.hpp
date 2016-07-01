@@ -70,22 +70,16 @@ namespace t3o
 						detail::buffer(&_tmp_read_packet_size, sizeof(_tmp_read_packet_size)),
 						detail::buffer(&_tmp_read_packet_id, sizeof(_tmp_read_packet_id))
 					}};
-					//<F5>_on_header_read<Serializables...>(handlers..., er, 1);
-					auto ptr = &basic_async_serializer<InputArchive, OutputArchive>
-							::_on_header_read<int>;
-				//	std::function<void(std::function<void(const Serializables)>...,
-					//		const boost::system::error_code&,
-					//		std::size_t)> binder 
-					//	= std::bind(ptr, this, handlers..., _1, _2);
-					//detail::async_read(_socket, packet, binder);
+					auto binder = std::bind(&basic_async_serializer<InputArchive, OutputArchive>
+							::_on_header_read<Serializables...>, this, _1, _2, handlers...);
+					detail::async_read(_socket, packet, binder);
 				}
 
 				auto& event_disconnected()
 				{
 					return _disconnected_event;
 				}
-
-			
+	
 			private:
 				template<typename Serializable>
 				std::array<detail::const_buffer, 3> _prepare_output_packet(const Serializable& t)
@@ -130,17 +124,14 @@ namespace t3o
 				}
 				
 				template<typename ...Serializables>
-				void _on_header_read(std::function<void(const Serializables&)>... handlers,
-						const detail::error_code& er, std::size_t)
+				void _on_header_read(const detail::error_code& er, std::size_t, std::function<void(const Serializables&)>... handlers)
 				{
-					//if(_check_connection(er)) return;
-//
-					//auto results = { _process_header(handlers)... };
-				//	auto it = std::find(std::begin(results), std::end(results), true);
-					//if(results == std::end(results))
-					//{
-					//	_disconnected_event(); //packet error
-					//}
+					if(_check_connection(er)) return;
+
+					auto results = { _process_header(handlers)... };
+					auto it = std::find(std::begin(results), std::end(results), true);
+
+					if(it == std::end(results)) _disconnected_event(); //packet error
 				}
 
 				template<typename Serializable>
@@ -158,8 +149,8 @@ namespace t3o
 					return true;
 				}
 
-				template<typename Serializable, typename Handler>
-				void _on_body_read(Handler handler, const detail::error_code& er, std::size_t size)
+				template<typename Serializable>
+				void _on_body_read(std::function<void(const Serializable&)> handler, const detail::error_code& er, std::size_t size)
 				{
 					if(_check_connection(er)) return;
 
