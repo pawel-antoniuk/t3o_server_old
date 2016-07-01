@@ -33,12 +33,13 @@ namespace t3o
 				close();
 			}
 
+			
 			void async_run()
 			{
-				_serializer.async_read<detail::protocol::field_set_packet_t>([this](auto& data){
-					std::cout << "kek" << std::endl;
-					_field_set_event(data.x, data.y, data.field);
-				});
+				using namespace std::placeholders;
+				using packet_t = detail::protocol::field_set_packet_t;
+				auto binder = std::bind(&game_session::_on_field_set, this, _1);
+				_serializer.async_read<packet_t>(binder);
 			}
 
 			template<typename Handler>
@@ -81,6 +82,13 @@ namespace t3o
 			}
 
 		private:
+			void _on_field_set(const detail::protocol::field_set_packet_t& data)
+			{
+				_field_set_event(data.x, data.y, data.field);
+				using namespace std::placeholders;
+				_serializer.async_read<detail::protocol::field_set_packet_t>(
+						std::bind(&game_session::_on_field_set, this, _1));
+			}
 
 			detail::tcp::socket _socket;
 			detail::text_async_serializer _serializer;

@@ -61,17 +61,34 @@ namespace t3o
 					detail::async_write(_socket, packet, binder);
 				}
 
+				template<typename T>
+				void test(T handler)
+				{
+				}
+				
 				template<typename Serializable, typename Handler>
 				void async_read(Handler handler)
 				{
+					Serializable t;
+					handler(t);
 					using namespace std::placeholders;
 					std::array<detail::mutable_buffer, 2> packet{{
 						detail::buffer(&_tmp_read_packet_size, sizeof(_tmp_read_packet_size)),
 						detail::buffer(&_tmp_read_packet_id, sizeof(_tmp_read_packet_id))
 					}};
-					auto binder = std::bind(&basic_async_serializer<InputArchive, OutputArchive>
-							::_on_header_read<Serializable, Handler>, this, handler, _1, _2);
-					detail::async_read(_socket, packet, binder);
+					//auto binder = std::bind(&basic_async_serializer<InputArchive, OutputArchive>
+					//		::_on_header_read<Serializable, Handler>, this, handler, _1, _2);
+					//auto binder = std::bind(&basic_async_serializer<InputArchive, OutputArchive>
+					//		::_on_packet_written<Serializable, Handler>, this, handler, _1, _2);
+
+					//binder(boost::system::errc::success, 0);
+					auto binder = std::bind(
+								&basic_async_serializer<InputArchive,OutputArchive>::test<Handler>, this, 
+								_1);
+
+					binder(handler);
+					
+				//i	detail::async_write(_socket, packet, binder);
 				}
 
 				auto& event_disconnected()
@@ -101,7 +118,7 @@ namespace t3o
 				Serializable _prepare_input_packet(const std::string& data, detail::packet_size_t size)
 				{
 					detail::istringstream iss{data};
-					iarchive_t archive{iss};
+					iarchive_t archive{iss, boost::archive::no_header};
 					Serializable t;
 					archive >> t;
 					return t;
@@ -130,10 +147,13 @@ namespace t3o
 
 					using namespace std::placeholders;
 					_tmp_read_packet_body.resize(_tmp_read_packet_size, 0);
-					auto binder = std::bind(&basic_async_serializer::_on_body_read<Serializable, Handler>, 
-								this, handler, _1, _2);
-					detail::async_read(_socket, detail::buffer(&_tmp_read_packet_body[0], _tmp_read_packet_size),
-							binder);
+					auto ptr = &basic_async_serializer<InputArchive, OutputArchive>
+							::_on_body_read<Serializable, Handler>;
+					//(*this.*ptr)(handler, er, size);
+					auto binder = std::bind(ptr, this, handler,er, size);
+					//binder();
+					//detail::async_read(_socket, detail::buffer(&_tmp_read_packet_body[0], _tmp_read_packet_size),
+					//		binder);
 				}
 
 				template<typename Serializable, typename Handler>
