@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <utility>
 #include <iostream> //debug
+#include <functional>
 
 #include "protocol_detail.hpp"
 #include "async_serializer.hpp"
@@ -33,15 +34,15 @@ namespace t3o
 				close();
 			}
 
-			
 			void async_run()
 			{
+				//do handshake
 				using namespace std::placeholders;
 				using packet_t = detail::protocol::field_set_packet_t;
 				auto binder = std::bind(&game_session::_on_field_set, this, _1);
 				_serializer.async_read<packet_t>(binder);
 			}
-
+			
 			template<typename Handler>
 			void async_send_field_set(unsigned x, unsigned y, unsigned field, Handler handler)
 			{
@@ -67,7 +68,6 @@ namespace t3o
 				return _serializer.event_disconnected();
 			}
 
-
 			void close()
 			{
 				if(_is_closed) return;
@@ -84,10 +84,9 @@ namespace t3o
 		private:
 			void _on_field_set(const detail::protocol::field_set_packet_t& data)
 			{
-				_field_set_event(data.x, data.y, data.field);
 				using namespace std::placeholders;
-				_serializer.async_read<detail::protocol::field_set_packet_t>(
-						std::bind(&game_session::_on_field_set, this, _1));
+				auto binder = std::bind(&game_session::_on_field_set, this, _1);
+				//_serializer.async_read<detail::protocol::field_set_packet_t>(binder);
 			}
 
 			detail::tcp::socket _socket;

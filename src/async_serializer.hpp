@@ -12,6 +12,7 @@
 #include <functional>
 #include <memory>
 #include <tuple>
+#include <algorithm>
 #include <iostream> //debug
 
 #include "event.hpp"
@@ -61,34 +62,22 @@ namespace t3o
 					detail::async_write(_socket, packet, binder);
 				}
 
-				template<typename T>
-				void test(T handler)
+				template<typename ...Serializables>
+				void async_read(std::function<void(const Serializables&)>... handlers)
 				{
-				}
-				
-				template<typename Serializable, typename Handler>
-				void async_read(Handler handler)
-				{
-					Serializable t;
-					handler(t);
 					using namespace std::placeholders;
 					std::array<detail::mutable_buffer, 2> packet{{
 						detail::buffer(&_tmp_read_packet_size, sizeof(_tmp_read_packet_size)),
 						detail::buffer(&_tmp_read_packet_id, sizeof(_tmp_read_packet_id))
 					}};
-					//auto binder = std::bind(&basic_async_serializer<InputArchive, OutputArchive>
-					//		::_on_header_read<Serializable, Handler>, this, handler, _1, _2);
-					//auto binder = std::bind(&basic_async_serializer<InputArchive, OutputArchive>
-					//		::_on_packet_written<Serializable, Handler>, this, handler, _1, _2);
-
-					//binder(boost::system::errc::success, 0);
-					auto binder = std::bind(
-								&basic_async_serializer<InputArchive,OutputArchive>::test<Handler>, this, 
-								_1);
-
-					binder(handler);
-					
-				//i	detail::async_write(_socket, packet, binder);
+					//<F5>_on_header_read<Serializables...>(handlers..., er, 1);
+					auto ptr = &basic_async_serializer<InputArchive, OutputArchive>
+							::_on_header_read<int>;
+				//	std::function<void(std::function<void(const Serializables)>...,
+					//		const boost::system::error_code&,
+					//		std::size_t)> binder 
+					//	= std::bind(ptr, this, handlers..., _1, _2);
+					//detail::async_read(_socket, packet, binder);
 				}
 
 				auto& event_disconnected()
@@ -126,40 +115,53 @@ namespace t3o
 
 				bool _check_connection(const detail::error_code& er)
 				{
-					if(er == detail::success) return true;
+					if(er == detail::success) return false;
 					_disconnected_event();
-					return false;
+					return true;
 				}
 
 				template<typename Serializable, typename Handler>
-				void _on_packet_written(Handler handler, const detail::error_code& er, std::size_t size)
+				void _on_packet_written(Handler handler, const detail::error_code& er, std::size_t)
 				{
-					if(!_check_connection(er)) return;
+					if(_check_connection(er)) return;
 
 					handler();
+					_clear_write_state();
 				}
 				
-				template<typename Serializable, typename Handler>
-				void _on_header_read(Handler handler, const detail::error_code& er, std::size_t size)
+				template<typename ...Serializables>
+				void _on_header_read(std::function<void(const Serializables&)>... handlers,
+						const detail::error_code& er, std::size_t)
 				{
-					if(!_check_connection(er)) return;
-					if(_tmp_read_packet_id != Serializable::packet_id) throw packet_format_error();
+					//if(_check_connection(er)) return;
+//
+					//auto results = { _process_header(handlers)... };
+				//	auto it = std::find(std::begin(results), std::end(results), true);
+					//if(results == std::end(results))
+					//{
+					//	_disconnected_event(); //packet error
+					//}
+				}
+
+				template<typename Serializable>
+				bool _process_header(std::function<void(const Serializable&)> handler)
+				{
+					if(_tmp_read_packet_id != Serializable::packet_id) return false;
 
 					using namespace std::placeholders;
 					_tmp_read_packet_body.resize(_tmp_read_packet_size, 0);
-					auto ptr = &basic_async_serializer<InputArchive, OutputArchive>
-							::_on_body_read<Serializable, Handler>;
-					//(*this.*ptr)(handler, er, size);
-					auto binder = std::bind(ptr, this, handler,er, size);
-					//binder();
-					//detail::async_read(_socket, detail::buffer(&_tmp_read_packet_body[0], _tmp_read_packet_size),
-					//		binder);
+					auto binder = std::bind(&basic_async_serializer<InputArchive, OutputArchive>
+							::_on_body_read<Serializable>, this, handler, _1, _2);
+					detail::async_read(_socket, detail::buffer(&_tmp_read_packet_body[0], _tmp_read_packet_size),
+							binder);
+
+					return true;
 				}
 
 				template<typename Serializable, typename Handler>
 				void _on_body_read(Handler handler, const detail::error_code& er, std::size_t size)
 				{
-					if(!_check_connection(er)) return;
+					if(_check_connection(er)) return;
 
 					auto t = _prepare_input_packet<Serializable>(_tmp_read_packet_body, _tmp_read_packet_size);
 					handler(t);

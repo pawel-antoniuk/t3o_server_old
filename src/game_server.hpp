@@ -62,9 +62,9 @@ namespace t3o
 			{
 				//std::cout << "new client " << _sessions.size() << std::endl;
 				using namespace std::placeholders;
-				session->event_field_set() += _user_field_set_event.make_handler(_1, _2, _3);
+				session->event_field_set() += _user_field_set_event.make_handler(std::ref(*session), _1, _2, _3);
 				session->event_disconnected() += 
-					std::bind(&game_server::_client_disconnected, this, session);
+					std::bind(&game_server::_on_client_disconnected, this, session);
 				_session_started_event(*session);
 				session->async_run();
 				_create_session();
@@ -79,7 +79,7 @@ namespace t3o
 						std::bind(&game_server::_on_accepted, this, session, _1));
 			}
 
-			void _client_disconnected(detail::session_ptr& session)
+			void _on_client_disconnected(detail::session_ptr& session)
 			{
 				//std::cout << "client disconeccted" << _sessions.size() << std::endl;
 				auto it = std::find(std::begin(_sessions), std::end(_sessions), session);
@@ -96,7 +96,7 @@ namespace t3o
 			//events
 			event<void(game_session&)> _session_started_event;
 			event<void(game_session&)> _session_ended_event;
-			event<void(unsigned, unsigned, unsigned)> _user_field_set_event;
+			event<void(game_session&, unsigned, unsigned, unsigned)> _user_field_set_event;
 	};
 }
 

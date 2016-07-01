@@ -23,7 +23,7 @@ int main()
 	server.event_session_ended() += [](auto& session){
 		std::cout << "bye" << std::endl;
 	};
-	server.event_user_field_set() += [](auto x, auto y, auto field){
+	server.event_user_field_set() += [](auto& session, auto x, auto y, auto field){
 		std::cout << x << ", " << y << ", " << field << std::endl;
 	};
 	std::cout << "server have beend started" << std::endl;
