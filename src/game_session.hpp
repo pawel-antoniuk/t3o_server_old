@@ -104,12 +104,17 @@ namespace t3o
 			{
 				return _serializer.event_disconnected();
 			}
+
+			auto& event_logged()
+			{
+				return _logged_event;
+			}
 		
 		private:
 			void _on_handshake(const detail::protocol::client_handshake& data)
 			{
 				_name.assign(std::begin(data.name), std::end(data.name));
-				_send_feedback(0, []{}); 
+				_send_feedback(0, [this]{ _logged_event(); }); 
 			}
 
 			void _listen_for_data()
@@ -146,6 +151,7 @@ namespace t3o
 			uint8_t _symbol;
 
 			//events
+			event<void()> _logged_event;
 			event<void(unsigned field, unsigned x, unsigned y)> _field_set_event;
 			event<void()> _disconnected_event;
 	};

@@ -17,8 +17,13 @@ int main()
 	asio::io_service service;
 	tcp::endpoint endpoint{tcp::v4(), 6667};
 	t3o::game_server server{service, endpoint};
-	server.event_session_started() += [](auto& session){
+	server.event_session_started() += [&server](auto& session){
 		std::cout << "hi" << std::endl;
+		session.event_logged() += [&server, &session]{
+			std::cout << "logged" << std::endl;
+			std::cout << session.name() << std::endl;
+			session.begin_game(2, 3, 3);
+		};
 	};
 	server.event_session_ended() += [](auto& session){
 		std::cout << "bye" << std::endl;
