@@ -5,6 +5,7 @@
 #include <utility>
 #include <iostream> //debug
 #include <functional>
+#include <ctime>
 
 #include "protocol_detail.hpp"
 #include "async_serializer.hpp"
@@ -25,8 +26,11 @@ namespace t3o
 			explicit game_session(detail::io_service& service) :
 				_socket{service},
 				_serializer{_socket},
+				_symbol{0},
 				_is_closed{false},
-				_symbol{0}
+				_is_logged{false},
+				_is_alive{true},
+				_is_ran{false}
 			{
 				_serializer.event_disconnected() += std::bind(&game_session::close, this);
 			}
@@ -39,6 +43,7 @@ namespace t3o
 			void async_run()
 			{
 				//do a harlemshake 
+				_is_ran = true;
 				using namespace std::placeholders;
 				auto binder = std::bind(&game_session::_on_handshake, this, _1);
 				_serializer.async_read<detail::protocol::client_handshake>(binder);
@@ -54,12 +59,23 @@ namespace t3o
 				_serializer.async_write(packet, handler);
 			}
 
+			bool keepalive()
+			{
+				if(!_is_alive) return false;
+				_is_alive = false;
+				detail::protocol::keepalive packet;
+				time(&packet.timestamp);
+				_serializer.async_write(packet, [this]{	});
+				return true;
+			}
+
 			void close()
 			{
 				if(_is_closed) return;
 				_disconnected_event();
 				_socket.close();
 				_is_closed = true;
+				_is_logged = false;
 			}
 
 			void begin_game(uint8_t symbol, uint8_t width, uint8_t height)
@@ -85,16 +101,33 @@ namespace t3o
 				return _name;
 			}
 
-			auto is_closed() const
-			{
-				return _is_closed;
-			}
-
 			auto symbol() const
 			{
 				return _symbol;
 			}
 
+			//flags
+			auto is_closed() const
+			{
+				return _is_closed;
+			}
+
+			auto is_logged() const
+			{
+				return _is_logged;
+			}
+
+			auto is_ran() const
+			{
+				return _is_ran;
+			}
+
+			auto is_working() const
+			{
+				return _is_ran && !_is_closed;
+			}
+
+			//events
 			auto& event_field_set() 
 			{
 				return _field_set_event;
@@ -114,14 +147,21 @@ namespace t3o
 			void _on_handshake(const detail::protocol::client_handshake& data)
 			{
 				_name.assign(std::begin(data.name), std::end(data.name));
-				_send_feedback(0, [this]{ _logged_event(); }); 
+				_send_feedback(0, [this]{
+					_is_logged = true;
+					_logged_event(); 
+				}); 
 			}
 
 			void _listen_for_data()
 			{
 				using namespace std::placeholders;
-				auto binder = std::bind(&game_session::_on_field_set, this, _1);
-				_serializer.async_read<detail::protocol::field_set_packet>(binder);
+				auto field_set_binder = std::bind(&game_session::_on_field_set, this, _1);
+				auto keepalive_binder = std::bind(&game_session::_on_keepalive, this, _1);
+				_serializer.async_read<
+					detail::protocol::field_set_packet,
+					detail::protocol::keepalive
+				>(field_set_binder, keepalive_binder);
 			}
 
 			void _on_field_set(const detail::protocol::field_set_packet& data)
@@ -130,6 +170,11 @@ namespace t3o
 						static_cast<unsigned>(data.x),
 						static_cast<unsigned>(data.y));
 				_listen_for_data();
+			}
+
+			void _on_keepalive(const detail::protocol::keepalive& data)
+			{
+				_is_alive = true;
 			}
 
 			void _send_feedback(uint8_t result, std::function<void()> callback)
@@ -146,9 +191,14 @@ namespace t3o
 
 			detail::tcp::socket _socket;
 			detail::text_async_serializer _serializer;
-			bool _is_closed;
 			std::string _name;
 			uint8_t _symbol;
+
+			//flags
+			bool _is_closed;
+			bool _is_logged;
+			bool _is_alive;
+			bool _is_ran;
 
 			//events
 			event<void()> _logged_event;

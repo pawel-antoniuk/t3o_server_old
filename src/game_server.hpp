@@ -1,12 +1,14 @@
 #pragma once
 #include <boost/asio.hpp>
 #include <boost/system/error_code.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <functional>
 #include <vector>
 #include <thread>
 #include <functional>
 #include <utility>
 #include <algorithm>
+#include <chrono>
 
 #include "game_session.hpp"
 #include "event.hpp"
@@ -20,16 +22,21 @@ namespace t3o
 		using std::function;
 		using std::vector;
 		using session_ptr = std::shared_ptr<game_session>;
+		using duration_t = boost::posix_time::time_duration;
 	}
 
 	class game_server 
 	{
 		public:
-			explicit game_server(detail::io_service& io_service, detail::tcp::endpoint ep) : 
+			explicit game_server(detail::io_service& io_service, detail::tcp::endpoint ep,
+					detail::duration_t keepalive_duration = boost::posix_time::seconds(2)) : 
 				_io_service{io_service}, 
 				_acceptor{_io_service, ep},
-				_is_listening{false}
+				_is_listening{false},
+				_keepalive_duration{keepalive_duration}
 			{
+				auto binder = std::bind(&game_server::_async_distribute_keepalive, this, _1);
+				timer.async_wait(binder);
 			}
 
 			void set_field(unsigned x, unsigned y, unsigned field)
@@ -52,6 +59,11 @@ namespace t3o
 				_acceptor.listen();
 			}
 
+			const auto& sessions() const
+			{
+				return _sessions;
+			}
+
 			//events
 			auto& event_session_started()
 			{
@@ -69,6 +81,19 @@ namespace t3o
 			}
 			
 		private:
+			void _async_distribute_keepalive(const boost::system::error_code&)
+			{
+				for(auto& s : _sessions) if(s->is_working())
+				{
+					auto result = s->keepalive();
+					std::cout << "keepalive: " << result << std::endl;
+				}
+				detail::deadline_timer timer(_io_service, _keepalive_duration);
+				using namespace std::placeholders;
+				auto binder = std::bind(&game_server::_async_distribute_keepalive, this, _1);
+				timer.async_wait(binder);
+			}
+
 			void _create_session()
 			{
 				auto session = std::make_shared<game_session>(_io_service);
@@ -106,6 +131,7 @@ namespace t3o
 			detail::tcp::acceptor _acceptor;
 			detail::vector<detail::session_ptr> _sessions;
 			bool _is_listening;
+			detail::duration_t _keepalive_duration;
 
 			//events
 			event<void(game_session&)> _session_started_event;

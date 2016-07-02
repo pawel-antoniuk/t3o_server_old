@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <array>
+#include <ctime>
 
 namespace t3o
 {
@@ -57,7 +58,18 @@ namespace t3o
 				}
 				static const unsigned packet_id = 4;
 			};
+			
+			struct keepalive
+			{
+				time_t timestamp;
 
+				template<typename Archive>
+				void serialize(Archive& ar, const unsigned)
+				{
+					ar & timestamp;
+				}
+				static const unsigned packet_id = 5;
+			};
 		}
 	}
 }
