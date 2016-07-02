@@ -26,6 +26,7 @@ int main()
 	server.event_user_field_set() += [](auto& session, auto x, auto y, auto field){
 		std::cout << x << ", " << y << ", " << field << std::endl;
 	};
-	std::cout << "server have beend started" << std::endl;
+	server.start_listen_for_players();
+	std::cout << "server has beend started" << std::endl;
 	service.run();
 }

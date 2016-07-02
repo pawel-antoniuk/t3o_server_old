@@ -89,9 +89,10 @@ namespace t3o
 					archive << t;
 					_tmp_write_output = oss.str();
 					_tmp_write_packet_size  = static_cast<uint8_t>(_tmp_write_output.size());
+					_tmp_write_packet_id = Serializable::packet_id;
 					std::array<detail::const_buffer, 3> packet{{
 						detail::buffer(&_tmp_write_packet_size, sizeof(_tmp_write_packet_size)),
-						detail::buffer(&Serializable::packet_id, sizeof(Serializable::packet_id)),
+						detail::buffer(&_tmp_write_packet_id, sizeof(_tmp_write_packet_id)),
 						detail::buffer(_tmp_write_output) 
 					}};
 					return packet;
@@ -181,6 +182,7 @@ namespace t3o
 
 				//write
 				detail::packet_size_t _tmp_write_packet_size;
+				detail::packet_id_t _tmp_write_packet_id;
 				std::string _tmp_write_output;
 
 

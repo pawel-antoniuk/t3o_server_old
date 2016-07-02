@@ -27,9 +27,9 @@ namespace t3o
 		public:
 			explicit game_server(detail::io_service& io_service, detail::tcp::endpoint ep) : 
 				_io_service{io_service}, 
-				_acceptor{_io_service, ep}
+				_acceptor{_io_service, ep},
+				_is_listening{false}
 			{
-				_create_session();
 			}
 
 			void set_field(unsigned x, unsigned y, unsigned field)
@@ -38,6 +38,18 @@ namespace t3o
 				{
 					session->async_send_field_set(x, y, field, []{/*do nothing*/});
 				}
+			}
+
+			void start_listen_for_players()
+			{
+				_is_listening = true;
+				_create_session();
+			}
+
+			void stop_listen_for_players()
+			{
+				_is_listening = false;
+				_acceptor.listen();
 			}
 
 			//events
@@ -57,19 +69,6 @@ namespace t3o
 			}
 			
 		private:
-			void _on_accepted(detail::session_ptr& session, 
-					const boost::system::error_code& code)
-			{
-				//std::cout << "new client " << _sessions.size() << std::endl;
-				using namespace std::placeholders;
-				session->event_field_set() += _user_field_set_event.make_handler(std::ref(*session), _1, _2, _3);
-				session->event_disconnected() += 
-					std::bind(&game_server::_on_client_disconnected, this, session);
-				_session_started_event(*session);
-				session->async_run();
-				_create_session();
-			}
-
 			void _create_session()
 			{
 				auto session = std::make_shared<game_session>(_io_service);
@@ -79,9 +78,23 @@ namespace t3o
 						std::bind(&game_server::_on_accepted, this, session, _1));
 			}
 
+			void _on_accepted(detail::session_ptr& session, 
+					const boost::system::error_code& code)
+			{
+				if(code != boost::system::errc::success) return;
+
+				using namespace std::placeholders;
+				session->event_field_set() += 
+					_user_field_set_event.make_handler(std::ref(*session), _1, _2, _3);
+				session->event_disconnected() += 
+					std::bind(&game_server::_on_client_disconnected, this, session);
+				_session_started_event(*session);
+				session->async_run();
+				_create_session();
+			}
+
 			void _on_client_disconnected(detail::session_ptr& session)
 			{
-				//std::cout << "client disconeccted" << _sessions.size() << std::endl;
 				auto it = std::find(std::begin(_sessions), std::end(_sessions), session);
 				if(it != std::end(_sessions)){
 					_sessions.erase(it);
@@ -92,6 +105,7 @@ namespace t3o
 			detail::io_service& _io_service;
 			detail::tcp::acceptor _acceptor;
 			detail::vector<detail::session_ptr> _sessions;
+			bool _is_listening;
 
 			//events
 			event<void(game_session&)> _session_started_event;

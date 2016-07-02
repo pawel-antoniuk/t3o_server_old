@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <array>
 
 namespace t3o
 {
@@ -7,20 +8,33 @@ namespace t3o
 	{
 		namespace protocol
 		{
-			struct handshake_t
+			struct client_handshake
 			{
-				uint8_t width, height, field;
+				uint8_t mode;
+				std::array<char, 16> name;
 
 				template<typename Archive>
 				void serialize(Archive& ar, const unsigned)
 				{
-					ar & width & height & field;
+					ar & mode & name;
 				}
 
-				static const uint8_t packet_id = 1;
+				static const unsigned packet_id = 1;
 			};
 
-			struct feedback_t
+			struct server_handshake
+			{
+				uint8_t symbol, width, height;
+
+				template<typename Archive>
+				void serialize(Archive& ar, const unsigned)
+				{
+					ar & symbol & width & height;
+				}
+				static const unsigned packet_id = 2;
+			};
+
+			struct feedback
 			{
 				uint8_t result;
 
@@ -29,11 +43,10 @@ namespace t3o
 				{
 					ar & result;
 				}
-
-				static const uint8_t packet_id = 2;
+				static const unsigned packet_id = 3;
 			};
 
-			struct field_set_packet_t
+			struct field_set_packet
 			{
 				uint8_t x, y, field;
 
@@ -42,8 +55,7 @@ namespace t3o
 				{ 
 					ar & x & y & field;
 				}
-
-				static const uint8_t packet_id = 3;
+				static const unsigned packet_id = 4;
 			};
 
 		}
