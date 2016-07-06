@@ -7,9 +7,12 @@
 #include <functional>
 #include <ctime>
 
-#include "protocol_detail.hpp"
-#include "async_serializer.hpp"
+#include "detail/protocol_detail.hpp"
 #include "event.hpp"
+#include "detail/basic_async_reader.hpp"
+#include "detail/basic_async_writer.hpp"
+#include "detail/serializers/text_iserializer.hpp"
+#include "detail/serializers/text_oserializer.hpp"
 
 namespace t3o
 {
@@ -18,6 +21,8 @@ namespace t3o
 		using namespace boost::asio;
 		using boost::asio::ip::tcp;
 		using std::array;
+		using async_text_reader = basic_async_reader<text_iserializer>;
+		using async_text_writer = basic_async_writer<text_oserializer>;
 	}
 
 	class game_session
@@ -25,14 +30,18 @@ namespace t3o
 		public:
 			explicit game_session(detail::io_service& service) :
 				_socket{service},
-				_serializer{_socket},
 				_symbol{0},
+				_reader{_socket},
+				_writer{_socket},
 				_is_closed{false},
 				_is_logged{false},
 				_is_alive{true},
 				_is_ran{false}
 			{
-				_serializer.event_disconnected() += std::bind(&game_session::close, this);
+				_reader.event_disconnected() 
+					+= std::bind(&game_session::_on_disconnected, this);
+				_writer.event_disconnected() 
+					+= std::bind(&game_session::_on_disconnected, this);
 			}
 
 			~game_session()
@@ -46,7 +55,7 @@ namespace t3o
 				_is_ran = true;
 				using namespace std::placeholders;
 				auto binder = std::bind(&game_session::_on_handshake, this, _1);
-				_serializer.async_read<detail::protocol::client_handshake>(binder);
+				_reader.async_read<detail::protocol::client_handshake>(binder);
 			}
 			
 			void async_send_field_set(unsigned field, unsigned x, unsigned y, 
@@ -56,7 +65,7 @@ namespace t3o
 				packet.x = x;
 				packet.y = y;
 				packet.field = field;
-				_serializer.async_write(packet, handler);
+				_writer.async_write(packet, handler);
 			}
 
 			bool keepalive()
@@ -65,7 +74,7 @@ namespace t3o
 				_is_alive = false;
 				detail::protocol::keepalive packet;
 				time(&packet.timestamp);
-				_serializer.async_write(packet, [this]{	});
+				_writer.async_write(packet, [this]{ std::cout << "on written" << std::endl;	});
 				return true;
 			}
 
@@ -84,7 +93,7 @@ namespace t3o
 				packet.symbol = _symbol = symbol;
 				packet.width = width;
 				packet.height = height;
-				_serializer.async_write(packet, [this]{ 
+				_writer.async_write(packet, [this]{ 
 					_recv_feedback([this](auto result){
 						_listen_for_data();												
 					});
@@ -135,7 +144,7 @@ namespace t3o
 
 			auto& event_disconnected()
 			{
-				return _serializer.event_disconnected();
+				return _disconnected_event;
 			}
 
 			auto& event_logged()
@@ -144,6 +153,12 @@ namespace t3o
 			}
 		
 		private:
+			void _on_disconnected()
+			{
+				close();
+				_disconnected_event();
+			}
+
 			void _on_handshake(const detail::protocol::client_handshake& data)
 			{
 				_name.assign(std::begin(data.name), std::end(data.name));
@@ -158,7 +173,7 @@ namespace t3o
 				using namespace std::placeholders;
 				auto field_set_binder = std::bind(&game_session::_on_field_set, this, _1);
 				auto keepalive_binder = std::bind(&game_session::_on_keepalive, this, _1);
-				_serializer.async_read<
+				_reader.async_read<
 					detail::protocol::field_set_packet,
 					detail::protocol::keepalive
 				>(field_set_binder, keepalive_binder);
@@ -174,25 +189,29 @@ namespace t3o
 
 			void _on_keepalive(const detail::protocol::keepalive& data)
 			{
+				std::cout << "on keep alive" << std::endl;
 				_is_alive = true;
+				_listen_for_data();
 			}
 
 			void _send_feedback(uint8_t result, std::function<void()> callback)
 			{
 				detail::protocol::feedback packet;
 				packet.result = result;
-				_serializer.async_write(packet, callback);
+				_writer.async_write(packet, callback);
 			}
 
 			void _recv_feedback(std::function<void(const detail::protocol::feedback&)> callback)
 			{
-				_serializer.async_read<detail::protocol::feedback>(callback);
+				_reader.async_read<detail::protocol::feedback>(callback);
 			}
 
 			detail::tcp::socket _socket;
-			detail::text_async_serializer _serializer;
 			std::string _name;
 			uint8_t _symbol;
+			
+			detail::async_text_reader _reader;
+			detail::async_text_writer _writer;
 
 			//flags
 			bool _is_closed;

@@ -15,6 +15,7 @@ unsigned count_online_players(const t3o::game_server& server)
 	return counter;
 }
 
+
 int main()
 {
 	using namespace boost;

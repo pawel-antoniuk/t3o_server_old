@@ -29,14 +29,17 @@ namespace t3o
 	{
 		public:
 			explicit game_server(detail::io_service& io_service, detail::tcp::endpoint ep,
-					detail::duration_t keepalive_duration = boost::posix_time::seconds(2)) : 
+					detail::duration_t keepalive_duration = boost::posix_time::seconds(5)) : 
 				_io_service{io_service}, 
 				_acceptor{_io_service, ep},
 				_is_listening{false},
-				_keepalive_duration{keepalive_duration}
+				_keepalive_duration{keepalive_duration},
+				_keepalive_timer{io_service}
 			{
+				using namespace std::placeholders;
 				auto binder = std::bind(&game_server::_async_distribute_keepalive, this, _1);
-				timer.async_wait(binder);
+				_keepalive_timer.expires_from_now(_keepalive_duration);
+				_keepalive_timer.async_wait(binder);
 			}
 
 			void set_field(unsigned x, unsigned y, unsigned field)
@@ -88,10 +91,10 @@ namespace t3o
 					auto result = s->keepalive();
 					std::cout << "keepalive: " << result << std::endl;
 				}
-				detail::deadline_timer timer(_io_service, _keepalive_duration);
 				using namespace std::placeholders;
 				auto binder = std::bind(&game_server::_async_distribute_keepalive, this, _1);
-				timer.async_wait(binder);
+				_keepalive_timer.expires_from_now(_keepalive_duration);
+				_keepalive_timer.async_wait(binder);
 			}
 
 			void _create_session()
@@ -132,6 +135,7 @@ namespace t3o
 			detail::vector<detail::session_ptr> _sessions;
 			bool _is_listening;
 			detail::duration_t _keepalive_duration;
+			detail::deadline_timer _keepalive_timer;
 
 			//events
 			event<void(game_session&)> _session_started_event;
