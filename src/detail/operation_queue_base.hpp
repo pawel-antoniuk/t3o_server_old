@@ -43,7 +43,7 @@ private:
 	void _update_queue()
 	{
 		if(_is_executing) return;
-		_operations.front()->async_execute();		
+		if(!_operations.empty()) _operations.front()->async_execute();		
 	}
 	
 	std::queue<std::unique_ptr<operation_base>> _operations;

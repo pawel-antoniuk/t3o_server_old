@@ -5,6 +5,7 @@
 #include <memory>
 #include <array>
 #include <cstdint>
+#include <iostream> //debug
 #include "basic_async_writing_operation.hpp"
 #include "operation_queue_base.hpp"
 #include "operation_environment.hpp"
@@ -37,6 +38,7 @@ public:
 	template<typename Serializable>
 	void async_write(const Serializable& object, std::function<void()> completion_handler)
 	{
+		std::cout << Serializable::packet_id << std::endl;
 		push_operation(std::make_unique<
 				basic_async_writing_operation<OutputSerializer,	Serializable>>(
 					_environment, completion_handler, object));

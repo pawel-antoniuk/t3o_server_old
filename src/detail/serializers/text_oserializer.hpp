@@ -19,7 +19,7 @@ public:
 		using device_t = boost::iostreams::array_sink;
 		device_t buffer(reinterpret_cast<char*>(output_data), output_size);
 		boost::iostreams::stream<device_t> strm(buffer);
-		boost::archive::text_oarchive archive(strm);
+		boost::archive::text_oarchive archive(strm, boost::archive::no_header);
 		archive << input_data;
 		strm.flush();
 		return strm.tellp();

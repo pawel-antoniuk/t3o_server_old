@@ -57,19 +57,25 @@ private:
 	bool _process_header()
 	{
 		using namespace std::placeholders;
-		auto buffer = boost::asio::buffer_cast<uint8_t*>(_environment.work_buffer);
-		if(buffer[0] != Serializable::packet_id)
+		auto buffer_ptr = boost::asio::buffer_cast<uint8_t*>(_environment.work_buffer);
+		auto packet_id = buffer_ptr[0];
+		auto packet_size = buffer_ptr[1];
+		if(packet_id != Serializable::packet_id)
 			return false;
+		auto buffer_size = boost::asio::buffer_size(_environment.work_buffer);
+		if(packet_size > buffer_size) throw std::runtime_error("bad packet size");
+		auto buffer = boost::asio::buffer(_environment.work_buffer, packet_size);
 		auto binder = std::bind(
 				&basic_async_reading_operation<InputSerializer, Serializables...>
 				::_on_body_read<Serializable>, this, _1, _2);
-		detail::async_read(_environment.socket, _environment.work_buffer, binder);
+		detail::async_read(_environment.socket, buffer, binder);
 		return true;
 	}
 
 	void _on_header_read(const boost::system::error_code& er, std::size_t)
 	{
 		if(_check_connection(er)) return;
+
 		auto results = { _process_header<Serializables>()... };
 		auto it = std::find(std::begin(results), std::end(results), true);
 		if(it == std::end(results)) throw std::runtime_error("header not found"); //TODO
@@ -78,14 +84,17 @@ private:
 	template<typename Serializable>
 	void _on_body_read(const boost::system::error_code& er, std::size_t)
 	{
+		std::cout << "on body read" << std::endl;
 		if(_check_connection(er)) return;
+
 		auto data = boost::asio::buffer_cast<uint8_t*>(_environment.work_buffer);
 		auto data_size = boost::asio::buffer_size(_environment.work_buffer) - 1;
 		InputSerializer::template process_input_data<Serializable>(&data[2], data[1], 
 				data, data_size);
 		auto serializable_obj = reinterpret_cast<Serializable*>(&data[2]);
 		using handle_t = std::function<void(const Serializable&)>;
-		std::get<handle_t>(_completion_handlers)(*serializable_obj);
+		auto handler = std::get<handle_t>(_completion_handlers);
+		handler(*serializable_obj);
 		_environment.inner_operation_complete_handler(*this);
 	}
 
