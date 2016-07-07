@@ -3,6 +3,7 @@
 #include <boost/system/error_code.hpp>
 #include <tuple>
 #include <array>
+#include <iostream>
 #include <boost/fusion/algorithm/iteration/for_each.hpp>
 #include "operation_base.hpp"
 #include "reading_operation_environment.hpp"
@@ -46,7 +47,7 @@ private:
 	{
 		if(er != boost::system::errc::success)
 		{
-			_environment.disconnected_handler();
+			_environment.disconnected_event();
 			return true;
 		}
 		return false;

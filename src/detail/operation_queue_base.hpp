@@ -18,6 +18,8 @@ namespace detail
 class operation_queue_base
 {
 public:
+	virtual ~operation_queue_base(){}
+
 	operation_queue_base() :
 		_is_executing(false)
 	{

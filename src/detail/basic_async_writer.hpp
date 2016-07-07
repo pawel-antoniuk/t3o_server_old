@@ -7,7 +7,7 @@
 #include <cstdint>
 #include "basic_async_writing_operation.hpp"
 #include "operation_queue_base.hpp"
-#include "writing_operation_environment.hpp"
+#include "operation_environment.hpp"
 #include "../event.hpp"
 
 namespace t3o
@@ -25,8 +25,8 @@ class basic_async_writer : public operation_queue_base
 {
 public:
 	basic_async_writer(detail::ip::tcp::socket& socket) :
-		_socket(socket),
-		_environment{socket}
+		_environment{socket, 
+			boost::asio::buffer(_work_buffer.data(), _work_buffer.size())}
 	{
 		using namespace std::placeholders;
 		auto binder = std::bind(&basic_async_writer<OutputSerializer>
@@ -48,8 +48,10 @@ public:
 	}
 
 private:
-	boost::asio::ip::tcp::socket& _socket;
-	writing_operation_environment _environment;
+	std::array<uint8_t, 128> _work_buffer;
+	operation_environment _environment;
+
+	//events
 	event<void()> _disconnected_event;
 };
 

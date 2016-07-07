@@ -9,7 +9,7 @@ namespace t3o
 namespace detail
 {
 
-struct reading_operation_environment
+struct operation_environment
 {
 	boost::asio::ip::tcp::socket& socket;
 	boost::asio::mutable_buffers_1 work_buffer;	

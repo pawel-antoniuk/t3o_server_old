@@ -44,7 +44,7 @@ public:
 
 	auto& event_disconnected()
 	{
-		return _disconnected_event;
+		return _environment.disconnected_event;
 	}
 
 private:

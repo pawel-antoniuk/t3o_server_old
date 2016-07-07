@@ -11,17 +11,18 @@ namespace detail
 
 class text_oserializer
 {
+public:
 	template<typename Serializable>
-	static void process_output_data(const Serializable& input_data,
+	static std::size_t process_output_data(const Serializable& input_data,
 			uint8_t* output_data, std::size_t output_size)
 	{
-		boost::string_ref output_str(reinterpret_cast<char*>(output_data), output_size);
-		using device_t = boost::iostreams::back_insert_device<boost::string_ref>;
-		device_t inserter(output_str);
-		boost::iostreams::stream<device_t> strm(inserter);
+		using device_t = boost::iostreams::array_sink;
+		device_t buffer(reinterpret_cast<char*>(output_data), output_size);
+		boost::iostreams::stream<device_t> strm(buffer);
 		boost::archive::text_oarchive archive(strm);
 		archive << input_data;
 		strm.flush();
+		return strm.tellp();
 	}
 };
 
